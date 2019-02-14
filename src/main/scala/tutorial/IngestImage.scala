@@ -21,13 +21,15 @@ import geotrellis.vector._
 
 import org.apache.spark._
 import org.apache.spark.rdd._
+import org.apache.hadoop.fs.Path
 
 import scala.io.StdIn
 import java.io.File
 
 object IngestImage {
   val inputPath = "file://" + new File("data/r-g-nir.tif").getAbsolutePath
-  val outputPath = "data/catalog"
+  val outputPath = "gs://ramas-develop/phil-test/catalog"
+  val hadoopPath = new Path(outputPath)
   def main(args: Array[String]): Unit = {
     // Setup Spark to use Kryo serializer.
     val conf =
@@ -36,6 +38,8 @@ object IngestImage {
         .setAppName("Spark Tiler")
         .set("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
         .set("spark.kryo.registrator", "geotrellis.spark.io.kryo.KryoRegistrator")
+        .set("spark.hadoop.google.cloud.auth.service.account.enable", "true")
+        .set("spark.hadoop.google.cloud.auth.service.account.json.keyfile", "/Users/phil.hachey/.config/gcloud/application_default_credentials.json")
 
     val sc = new SparkContext(conf)
     try {
@@ -84,17 +88,17 @@ object IngestImage {
         .reproject(WebMercator, layoutScheme, Bilinear)
 
     // Create the attributes store that will tell us information about our catalog.
-    val attributeStore = FileAttributeStore(outputPath)
+    val attributeStore = HadoopAttributeStore(outputPath)
 
     // Create the writer that we will use to store the tiles in the local catalog.
-    val writer = FileLayerWriter(attributeStore)
+    val writer = HadoopLayerWriter(hadoopPath, attributeStore)
 
     // Pyramiding up the zoom levels, write our tiles out to the local file system.
     Pyramid.upLevels(reprojected, layoutScheme, zoom, Bilinear) { (rdd, z) =>
       val layerId = LayerId("landsat", z)
       // If the layer exists already, delete it out before writing
       if(attributeStore.layerExists(layerId)) {
-        new FileLayerManager(attributeStore).delete(layerId)
+        new HadoopLayerManager(attributeStore).delete(layerId)
       }
       writer.write(layerId, rdd, ZCurveKeyIndexMethod)
     }

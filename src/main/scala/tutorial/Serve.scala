@@ -4,6 +4,7 @@ import geotrellis.raster._
 import geotrellis.raster.render._
 import geotrellis.spark._
 import geotrellis.spark.io.{ValueReader, _}
+import geotrellis.spark.io.hadoop._
 import geotrellis.vector._
 import geotrellis.vector.io._
 import geotrellis.vector.io.json._
@@ -20,17 +21,33 @@ import com.typesafe.config.ConfigFactory
 import MaskBandsRandGandNIR.{G_BAND, NIR_BAND, R_BAND}
 import geotrellis.proj4.{CRS, LatLng}
 
+import org.apache.spark._
+import org.apache.spark.rdd._
+import org.apache.hadoop.fs.Path
+
 object Serve extends App with Service {
-  val catalogPath = new java.io.File("data/catalog").toURI
+  val outputPath = "gs://ramas-develop/phil-test/catalog"
+  val hadoopPath = new Path(outputPath)
+
+  val conf =
+    new SparkConf()
+      .setMaster("local[*]")
+      .setAppName("Spark Tiler")
+      .set("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
+      .set("spark.kryo.registrator", "geotrellis.spark.io.kryo.KryoRegistrator")
+      .set("spark.hadoop.google.cloud.auth.service.account.enable", "true")
+      .set("spark.hadoop.google.cloud.auth.service.account.json.keyfile", "/Users/phil.hachey/.config/gcloud/application_default_credentials.json")
+
+  implicit val sc = new SparkContext(conf)
+  
+  // val catalogPath = new java.io.File("data/catalog").toURI
+
   // Create a readers that will read in the indexed tiles we produced in IngestImage.
-  val attributeStore: AttributeStore =
-    AttributeStore(catalogPath)
+  val attributeStore = HadoopAttributeStore(outputPath)
 
-  val valueReader: ValueReader[LayerId] =
-    ValueReader(attributeStore, catalogPath)
+  val valueReader = HadoopValueReader(attributeStore)
 
-  val collectionReader: CollectionLayerReader[LayerId] =
-    CollectionLayerReader(attributeStore, catalogPath)
+  val collectionReader = HadoopCollectionLayerReader(attributeStore)
 
   val ndviColorMap =
     ColorMap.fromStringDouble(ConfigFactory.load().getString("tutorial.ndviColormap")).get

@@ -32,7 +32,8 @@ libraryDependencies ++= Seq(
   "com.typesafe.akka" %% "akka-actor"  % "2.4.3",
   "com.typesafe.akka" %% "akka-http" % "10.0.3",
   "com.typesafe.akka" %% "akka-http-spray-json" % "10.0.7",
-  "org.scalatest" %% "scalatest" % "2.2.0" % "test"
+  "org.scalatest" %% "scalatest" % "2.2.0" % "test",
+  "com.google.cloud.bigdataoss" % "gcs-connector" % "hadoop2-1.9.13"
 )
 
 assemblyMergeStrategy in assembly := {
